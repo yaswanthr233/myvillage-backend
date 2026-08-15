@@ -7,13 +7,13 @@ const db = require('./db');
 app.use(express.json());
 app.use(cors());
 
-
+const PORT = process.env.PORT || 3000;
 
 const initializeDatabaseAndServer = async () => {
     await db.connect();
     try{
-        app.listen(import.meta.env.VITE_PORT || 3000,"0.0.0.0", () => {
-            console.log("Server is running on port 3000");
+        app.listen(PORT, "0.0.0.0", () => {
+            console.log(`Server is running on port ${PORT}`);
         });
     } catch (error) {
         console.error("Error starting the server:", error.message);
