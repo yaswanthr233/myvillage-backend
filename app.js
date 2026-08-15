@@ -6,7 +6,7 @@ const app = express();
 const db = require('./db');
 
 const allowedOrigins = [
-    "https://myvillage-p124fw5b3-yaswanth-reddys-projects-9a89efb2.vercel.app"
+    "https://my-village-zeta.vercel.app"
 ];
 
 app.use(cors({
