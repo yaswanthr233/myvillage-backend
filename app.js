@@ -1,28 +1,19 @@
-require("dotenv").config();
-
-console.log("=== MYVILLAGE BACKEND NEW VERSION ===");
-console.log("DATABASE_URL exists:", !!process.env.DATABASE_URL);
-console.log("JWT_SECRET exists:", !!process.env.JWT_SECRET);
-
-const express = require("express");
-const bcrypt = require("bcrypt");
-const cors = require("cors");
-const jwt = require("jsonwebtoken");
+const express = require('express');
+const bcrypt = require('bcrypt');
+const cors = require('cors');
+const jwt = require('jsonwebtoken');
 const app = express();
-const db = require("./db");
-
+const db = require('./db');
 app.use(express.json());
 app.use(cors());
-
-const PORT = process.env.VITE_PORT || 3000;
 
 
 
 const initializeDatabaseAndServer = async () => {
     await db.connect();
     try{
-        app.listen(PORT,"0.0.0.0", () => {
-            console.log(`Server is running on port ${PORT}`);
+        app.listen(import.meta.env.VITE_PORT || 3000,"0.0.0.0", () => {
+            console.log("Server is running on port 3000");
         });
     } catch (error) {
         console.error("Error starting the server:", error.message);
