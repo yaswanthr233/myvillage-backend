@@ -5,7 +5,16 @@ const jwt = require('jsonwebtoken');
 const app = express();
 const db = require('./db');
 app.use(express.json());
-app.use(cors());
+const allowedOrigins = [
+    "https://myvillage-p124fw5b3-yaswanth-reddys-projects-9a89efb2.vercel.app"
+];
+
+app.use(cors({
+    origin: allowedOrigins,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true
+}));
 
 const PORT = process.env.PORT || 3000;
 
