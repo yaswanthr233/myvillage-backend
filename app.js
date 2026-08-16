@@ -1,77 +1,26 @@
-require("dotenv").config();
-
-const express = require("express");
-const bcrypt = require("bcrypt");
-const cors = require("cors");
-const jwt = require("jsonwebtoken");
+const express = require('express');
+const bcrypt = require('bcrypt');
+const cors = require('cors');
+const jwt = require('jsonwebtoken');
 const app = express();
-const db = require("./db");
-
-const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET;
-
-if (!JWT_SECRET) {
-    console.error("JWT_SECRET is missing");
-    process.exit(1);
-}
-const allowedOrigins = [
-    "https://my-village-zeta.vercel.app"
-];
-
-const corsOptions = {
-    origin: function (origin, callback) {
-        if (!origin) {
-            return callback(null, true);
-        }
-
-        if (allowedOrigins.includes(origin)) {
-            return callback(null, true);
-        }
-
-        console.log("Blocked CORS origin:", origin);
-        return callback(new Error("Not allowed by CORS"));
-    },
-
-    methods: [
-        "GET",
-        "POST",
-        "PUT",
-        "DELETE",
-        "OPTIONS"
-    ],
-
-    allowedHeaders: [
-        "Content-Type",
-        "Authorization"
-    ],
-
-    credentials: true
-};
-
+const db = require('./db');
 
 app.use(cors(corsOptions));
-app.options("*", cors(corsOptions));
-
+app.options(/.*/, cors(corsOptions));
 app.use(express.json());
 
 
+
 const initializeDatabaseAndServer = async () => {
-    try {
-        await db.query("SELECT 1");
-
-        console.log("Database connected successfully");
-
-        app.listen(PORT, "0.0.0.0", () => {
-            console.log(`Server is running on port ${PORT}`);
+    await db.connect();
+    try{
+        app.listen(3000,"0.0.0.0", () => {
+            console.log("Server is running on port 3000");
         });
-
     } catch (error) {
-        console.error("Database connection failed:");
-        console.error(error);
-
-        process.exit(1);
+        console.error("Error starting the server:", error.message);
     }
-};
+}
 
 initializeDatabaseAndServer();
 
@@ -85,7 +34,7 @@ const authenticateToken = (request, response, next) => {
     response.status(401);
     response.send("Invalid JWT Token");
   } else {
-    jwt.verify(jwtToken, process.env.JWT_SECRET, async (error, payload) => {
+    jwt.verify(jwtToken, "jwt", async (error, payload) => {
       if (error) {
         response.status(401);
         response.send("Invalid JWT Token");
@@ -126,7 +75,7 @@ app.post('/login', async (req, res) => {
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if(isPasswordValid){
             const payload = { email: user.email};
-            const token = jwt.sign(payload, process.env.JWT_SECRET);
+            const token = jwt.sign(payload, 'jwt');
             res.status(200).json({token, name: user.name, userId: user.user_id,role: user.role});
         } else {
             res.status(400).send("Invalid Password");
