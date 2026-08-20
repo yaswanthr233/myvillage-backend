@@ -14,8 +14,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "jwt";
 
 
 const allowedOrigins = [
-    "https://my-village-zeta.vercel.app",
-    "http://localhost:5173",
+    "https://my-village-zeta.vercel.app"
 ];
 
 const corsOptions = {
