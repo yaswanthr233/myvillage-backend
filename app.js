@@ -4,24 +4,60 @@ const express = require("express");
 const bcrypt = require("bcrypt");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
+
 const app = express();
+
 const db = require("./db");
 
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || "jwt";
+
 
 const allowedOrigins = [
     "https://my-village-zeta.vercel.app",
     "http://localhost:5173",
 ];
 
-app.use(cors({
-    origin: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-}));
 
-app.options("*", cors());
+const corsOptions = {
+
+    origin: function (origin, callback) {
+
+        if (
+            !origin ||
+            allowedOrigins.includes(origin)
+        ) {
+            return callback(null, true);
+        }
+
+        console.log(
+            "Blocked CORS origin:",
+            origin
+        );
+
+        return callback(
+            new Error("Not allowed by CORS")
+        );
+    },
+
+    methods: [
+        "GET",
+        "POST",
+        "PUT",
+        "DELETE",
+        "OPTIONS"
+    ],
+
+    allowedHeaders: [
+        "Content-Type",
+        "Authorization"
+    ],
+
+    credentials: true
+};
+
+
+app.use(cors(corsOptions));
 
 app.use(express.json());
 
