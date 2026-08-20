@@ -4,139 +4,305 @@ const express = require("express");
 const bcrypt = require("bcrypt");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
+
 const app = express();
 const db = require("./db");
 
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || "jwt";
 
+/* =========================
+   CORS CONFIGURATION
+========================= */
+
 const allowedOrigins = [
     "https://my-village-zeta.vercel.app",
-    "http://localhost:5173",
+    "http://localhost:5173"
 ];
 
-const corsOptions = {
-    origin: function (origin, callback) {
-        if (!origin || allowedOrigins.includes(origin)) {
-            return callback(null, true);
-        }
+app.use(
+    cors({
+        origin: function (origin, callback) {
+            // Allow requests without Origin
+            // Example: Postman, server-to-server requests
+            if (!origin) {
+                return callback(null, true);
+            }
 
-        console.log("Blocked CORS origin:", origin);
-        return callback(new Error("Not allowed by CORS"));
-    },
+            if (allowedOrigins.includes(origin)) {
+                return callback(null, true);
+            }
 
-    methods: [
-        "GET",
-        "POST",
-        "PUT",
-        "DELETE",
-        "OPTIONS"
-    ],
+            console.log("Blocked CORS origin:", origin);
+            return callback(new Error("Not allowed by CORS"));
+        },
 
-    allowedHeaders: [
-        "Content-Type",
-        "Authorization"
-    ],
+        methods: [
+            "GET",
+            "POST",
+            "PUT",
+            "DELETE",
+            "OPTIONS"
+        ],
 
-    credentials: true
-};
+        allowedHeaders: [
+            "Content-Type",
+            "Authorization"
+        ]
+    })
+);
 
-app.use(cors(corsOptions));
-app.options(/.*/, cors(corsOptions));
+/* =========================
+   MIDDLEWARE
+========================= */
 
 app.use(express.json());
 
-
+/* =========================
+   DATABASE + SERVER
+========================= */
 
 const initializeDatabaseAndServer = async () => {
-    await db.connect();
-    try{
-        app.listen(PORT,"0.0.0.0", () => {
+    try {
+        await db.connect();
+
+        app.listen(PORT, "0.0.0.0", () => {
             console.log(`Server is running on port ${PORT}`);
+            console.log(`Port: ${PORT}`);
         });
     } catch (error) {
-        console.error("Error starting the server:", error.message);
+        console.error("Error starting server:", error);
+        process.exit(1);
     }
-}
+};
 
 initializeDatabaseAndServer();
 
+/* =========================
+   JWT AUTHENTICATION
+========================= */
+
 const authenticateToken = (request, response, next) => {
-  let jwtToken;
-  const authHeader = request.headers["authorization"];
-  if (authHeader !== undefined) {
-    jwtToken = authHeader.split(" ")[1];
-  }
-  if (jwtToken === undefined) {
-    response.status(401);
-    response.send("Invalid JWT Token");
-  } else {
-    jwt.verify(jwtToken, JWT_SECRET, async (error, payload) => {
-      if (error) {
-        response.status(401);
-        response.send("Invalid JWT Token");
-      } else {
-        request.username = payload.username;
+    const authHeader = request.headers["authorization"];
+
+    if (!authHeader) {
+        return response.status(401).send("Invalid JWT Token");
+    }
+
+    const jwtToken = authHeader.split(" ")[1];
+
+    if (!jwtToken) {
+        return response.status(401).send("Invalid JWT Token");
+    }
+
+    jwt.verify(jwtToken, JWT_SECRET, (error, payload) => {
+        if (error) {
+            return response.status(401).send("Invalid JWT Token");
+        }
+
+        // Login creates token using email
+        request.email = payload.email;
+
         next();
-      }
     });
-  }
 };
 
+/* =========================
+   HOME
+========================= */
+
 app.get("/", (req, res) => {
-    res.send("MyVillage Backend Running Successfully");
+    res.status(200).send("MyVillage Backend Running Successfully");
 });
 
-app.post('/register', async (req, res) => {
-    const {email, password, name, phoneNumber, village} = req.body;
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const selectQuery = `SELECT * FROM users WHERE email = $1`;
-    const dbUser = await db.query(selectQuery, [email]);
-    if(dbUser.rows.length === 0){
-        const insertQuery = `INSERT INTO users (email, password, name, phone_number, village) VALUES ($1, $2, $3, $4, $5)`;
-        await db.query(insertQuery, [email, hashedPassword, name, phoneNumber, village]);
-        res.status(200).send("User created successfully");
-    } else {
-        res.status(400).send("User already exists");
-    }
-})
+/* =========================
+   REGISTER
+========================= */
 
-app.post('/login', async (req, res) => {
-    const {email, password} = req.body;
-    const selectQuery = `SELECT * FROM users WHERE email = $1`;
-    const dbUser = await db.query(selectQuery, [email]);
-    if(dbUser.rows.length === 0){
-        res.status(400).send("Invalid Email");
-    } else {
-        const user = dbUser.rows[0];
-        const isPasswordValid = await bcrypt.compare(password, user.password);
-        if(isPasswordValid){
-            const payload = { email: user.email};
-            const token = jwt.sign(payload, JWT_SECRET);
-            res.status(200).json({token, name: user.name, userId: user.user_id,role: user.role,phone: user.phone_number,email: user.email});
-        } else {
-            res.status(400).send("Invalid Password");
+app.post("/register", async (req, res) => {
+    try {
+        const {
+            email,
+            password,
+            name,
+            phoneNumber,
+            village
+        } = req.body;
+
+        if (!email || !password || !name) {
+            return res.status(400).json({
+                message: "Email, password and name are required"
+            });
         }
+
+        const selectQuery = `
+            SELECT *
+            FROM users
+            WHERE email = $1
+        `;
+
+        const dbUser = await db.query(selectQuery, [email]);
+
+        if (dbUser.rows.length > 0) {
+            return res.status(400).send("User already exists");
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        const insertQuery = `
+            INSERT INTO users
+            (email, password, name, phone_number, village)
+            VALUES ($1, $2, $3, $4, $5)
+        `;
+
+        await db.query(insertQuery, [
+            email,
+            hashedPassword,
+            name,
+            phoneNumber,
+            village
+        ]);
+
+        return res.status(200).send("User created successfully");
+
+    } catch (error) {
+        console.error("REGISTER ERROR:", error);
+
+        return res.status(500).json({
+            message: "Internal server error"
+        });
     }
-})
+});
 
-app.get('/discussions', authenticateToken, async (req, res) => {
-    const selectQuery = `SELECT d.*, u.name,u.role FROM discussions d inner join users u on d.user_id = u.user_id order by d.created_at desc`;
-    const dbDiscussions = await db.query(selectQuery);
-    res.status(200).json(dbDiscussions.rows);
-})
+/* =========================
+   LOGIN
+========================= */
 
-app.post('/discussions', authenticateToken, async (req, res) => {
-        const { title, content, category, userId, imageUrl } = req.body;
+app.post("/login", async (req, res) => {
+    try {
+        const {
+            email,
+            password
+        } = req.body;
+
+        if (!email || !password) {
+            return res.status(400).json({
+                message: "Email and password are required"
+            });
+        }
+
+        const selectQuery = `
+            SELECT *
+            FROM users
+            WHERE email = $1
+        `;
+
+        const dbUser = await db.query(selectQuery, [email]);
+
+        if (dbUser.rows.length === 0) {
+            return res.status(400).send("Invalid Email");
+        }
+
+        const user = dbUser.rows[0];
+
+        const isPasswordValid = await bcrypt.compare(
+            password,
+            user.password
+        );
+
+        if (!isPasswordValid) {
+            return res.status(400).send("Invalid Password");
+        }
+
+        /* JWT payload */
+        const payload = {
+            email: user.email
+        };
+
+        const token = jwt.sign(
+            payload,
+            JWT_SECRET,
+            {
+                expiresIn: "7d"
+            }
+        );
+
+        return res.status(200).json({
+            token,
+            name: user.name,
+            userId: user.user_id,
+            role: user.role,
+            phone: user.phone_number,
+            email: user.email
+        });
+
+    } catch (error) {
+        console.error("LOGIN ERROR:", error);
+
+        return res.status(500).json({
+            message: "Internal server error"
+        });
+    }
+});
+
+/* =========================
+   GET DISCUSSIONS
+========================= */
+
+app.get("/discussions", authenticateToken, async (req, res) => {
+    try {
+        const selectQuery = `
+            SELECT
+                d.*,
+                u.name,
+                u.role
+            FROM discussions d
+            INNER JOIN users u
+                ON d.user_id = u.user_id
+            ORDER BY d.created_at DESC
+        `;
+
+        const dbDiscussions = await db.query(selectQuery);
+
+        return res.status(200).json(dbDiscussions.rows);
+
+    } catch (error) {
+        console.error("GET DISCUSSIONS ERROR:", error);
+
+        return res.status(500).json({
+            message: "Internal server error"
+        });
+    }
+});
+
+/* =========================
+   CREATE DISCUSSION
+========================= */
+
+app.post("/discussions", authenticateToken, async (req, res) => {
+    try {
+        const {
+            title,
+            content,
+            category,
+            userId,
+            imageUrl
+        } = req.body;
 
         const insertQuery = `
             INSERT INTO discussions
-            (title, content, category, user_id, image_url)
+            (
+                title,
+                content,
+                category,
+                user_id,
+                image_url
+            )
             VALUES ($1, $2, $3, $4, $5)
             RETURNING *
         `;
 
-        await db.query(insertQuery, [
+        const result = await db.query(insertQuery, [
             title,
             content,
             category,
@@ -144,60 +310,216 @@ app.post('/discussions', authenticateToken, async (req, res) => {
             imageUrl
         ]);
 
-        res.status(201).json({
-            message: "Discussion created successfully"
+        return res.status(201).json({
+            message: "Discussion created successfully",
+            discussion: result.rows[0]
         });
+
+    } catch (error) {
+        console.error("CREATE DISCUSSION ERROR:", error);
+
+        return res.status(500).json({
+            message: "Internal server error"
+        });
+    }
 });
 
-app.get('/issues', authenticateToken, async (req, res) => {
-    const selectQuery = `SELECT i.*, u.name FROM issues i inner join users u on i.user_id = u.user_id order by i.created_at desc`;
-    const dbIssues = await db.query(selectQuery);
-    res.status(200).json(dbIssues.rows);
-})
+/* =========================
+   GET ISSUES
+========================= */
 
-app.post('/issues', authenticateToken, async (req, res) => {
-    const { title, description, category, location, userId, image } = req.body;
-    const result = await db.query(
-        `INSERT INTO issues (title, description, category, location, user_id, image_url, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())`,
-        [title, description, category, location, userId, image]
-    );
-    res.status(201).json({
-        message: "Issue created successfully",
-        issue: result.rows[0]
+app.get("/issues", authenticateToken, async (req, res) => {
+    try {
+        const selectQuery = `
+            SELECT
+                i.*,
+                u.name
+            FROM issues i
+            INNER JOIN users u
+                ON i.user_id = u.user_id
+            ORDER BY i.created_at DESC
+        `;
+
+        const dbIssues = await db.query(selectQuery);
+
+        return res.status(200).json(dbIssues.rows);
+
+    } catch (error) {
+        console.error("GET ISSUES ERROR:", error);
+
+        return res.status(500).json({
+            message: "Internal server error"
+        });
+    }
+});
+
+/* =========================
+   CREATE ISSUE
+========================= */
+
+app.post("/issues", authenticateToken, async (req, res) => {
+    try {
+        const {
+            title,
+            description,
+            category,
+            location,
+            userId,
+            image
+        } = req.body;
+
+        const result = await db.query(
+            `
+            INSERT INTO issues
+            (
+                title,
+                description,
+                category,
+                location,
+                user_id,
+                image_url,
+                created_at,
+                updated_at
+            )
+            VALUES
+            ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+            RETURNING *
+            `,
+            [
+                title,
+                description,
+                category,
+                location,
+                userId,
+                image
+            ]
+        );
+
+        return res.status(201).json({
+            message: "Issue created successfully",
+            issue: result.rows[0]
+        });
+
+    } catch (error) {
+        console.error("CREATE ISSUE ERROR:", error);
+
+        return res.status(500).json({
+            message: "Internal server error"
+        });
+    }
+});
+
+/* =========================
+   UPDATE ISSUE STATUS
+========================= */
+
+app.put("/issues/:id", authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status } = req.body;
+
+        const updateQuery = `
+            UPDATE issues
+            SET
+                status = $1,
+                updated_at = NOW()
+            WHERE id = $2
+            RETURNING *
+        `;
+
+        const result = await db.query(
+            updateQuery,
+            [status, id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                message: "Issue not found"
+            });
+        }
+
+        return res.status(200).json({
+            message: "Issue updated successfully",
+            issue: result.rows[0]
+        });
+
+    } catch (error) {
+        console.error("UPDATE ISSUE ERROR:", error);
+
+        return res.status(500).json({
+            message: "Internal server error"
+        });
+    }
+});
+
+/* =========================
+   UPDATE PROFILE PICTURE
+========================= */
+
+app.put(
+    "/users/:userId/profile-picture",
+    authenticateToken,
+    async (req, res) => {
+        try {
+            const { userId } = req.params;
+            const { profilePictureUrl } = req.body;
+
+            const updateQuery = `
+                UPDATE users
+                SET profile_picture_url = $1
+                WHERE user_id = $2
+                RETURNING *
+            `;
+
+            const result = await db.query(
+                updateQuery,
+                [profilePictureUrl, userId]
+            );
+
+            if (result.rows.length === 0) {
+                return res.status(404).json({
+                    message: "User not found"
+                });
+            }
+
+            return res.status(200).json({
+                message: "Profile picture updated successfully",
+                user: result.rows[0]
+            });
+
+        } catch (error) {
+            console.error(
+                "UPDATE PROFILE PICTURE ERROR:",
+                error
+            );
+
+            return res.status(500).json({
+                message: "Internal server error"
+            });
+        }
+    }
+);
+
+/* =========================
+   GLOBAL ERROR HANDLER
+========================= */
+
+app.use((error, req, res, next) => {
+    console.error("GLOBAL ERROR:", error);
+
+    if (error.message === "Not allowed by CORS") {
+        return res.status(403).json({
+            message: "CORS blocked this origin"
+        });
+    }
+
+    return res.status(500).json({
+        message: "Internal server error"
     });
-})
+});
 
-
-app.put('/issues/:id', authenticateToken, async (req, res) => {
-    const { id } = req.params;
-    const { status } = req.body;
-    const updateQuery = `
-        UPDATE issues
-        SET status = $1, updated_at = NOW()
-        WHERE id = $2
-        RETURNING *
-    `;
-    const result = await db.query(updateQuery, [status, id]);
-    res.status(200).json({
-        message: "Issue updated successfully",
-        issue: result.rows[0]
-    });
-})
-
-app.put('/users/:userId/profile-picture', authenticateToken, async (req, res) => {
-    const { userId } = req.params;
-    const { profilePictureUrl } = req.body;
-    const updateQuery = `
-        UPDATE users
-        SET profile_picture_url = $1
-        WHERE user_id = $2
-        RETURNING *
-    `;
-    const result = await db.query(updateQuery, [profilePictureUrl, userId]);
-    res.status(200).json({
-        message: "Profile picture updated successfully",
-        user: result.rows[0]
-    });
-})
+/* =========================
+   EXPORT
+========================= */
 
 module.exports = app;
