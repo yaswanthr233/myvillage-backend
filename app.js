@@ -462,7 +462,7 @@ app.put(
     async (req, res) => {
         try {
             const { userId } = req.params;
-            const { profilePictureUrl } = req.body;
+            const { profile_picture_url } = req.body;
 
             const updateQuery = `
                 UPDATE users
@@ -473,7 +473,7 @@ app.put(
 
             const result = await db.query(
                 updateQuery,
-                [profilePictureUrl, userId]
+                [profile_picture_url, userId]
             );
 
             if (result.rows.length === 0) {
