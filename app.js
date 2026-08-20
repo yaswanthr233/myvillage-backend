@@ -11,9 +11,7 @@ const db = require("./db");
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || "jwt";
 
-/* =========================
-   CORS CONFIGURATION
-========================= */
+
 
 const allowedOrigins = [
     "https://my-village-zeta.vercel.app",
@@ -22,9 +20,7 @@ const allowedOrigins = [
 
 app.use(
     cors({
-        origin: function (origin, callback) {
-            // Allow requests without Origin
-            // Example: Postman, server-to-server requests
+        origin: function (origin, callback) {      
             if (!origin) {
                 return callback(null, true);
             }
@@ -52,15 +48,9 @@ app.use(
     })
 );
 
-/* =========================
-   MIDDLEWARE
-========================= */
 
 app.use(express.json());
 
-/* =========================
-   DATABASE + SERVER
-========================= */
 
 const initializeDatabaseAndServer = async () => {
     try {
@@ -78,9 +68,6 @@ const initializeDatabaseAndServer = async () => {
 
 initializeDatabaseAndServer();
 
-/* =========================
-   JWT AUTHENTICATION
-========================= */
 
 const authenticateToken = (request, response, next) => {
     const authHeader = request.headers["authorization"];
@@ -107,17 +94,12 @@ const authenticateToken = (request, response, next) => {
     });
 };
 
-/* =========================
-   HOME
-========================= */
+
 
 app.get("/", (req, res) => {
     res.status(200).send("MyVillage Backend Running Successfully");
 });
 
-/* =========================
-   REGISTER
-========================= */
 
 app.post("/register", async (req, res) => {
     try {
@@ -151,8 +133,8 @@ app.post("/register", async (req, res) => {
 
         const insertQuery = `
             INSERT INTO users
-            (email, password, name, phone_number, village)
-            VALUES ($1, $2, $3, $4, $5)
+            (email, password, name, phone_number, village,role)
+            VALUES ($1, $2, $3, $4, $5, $6)
         `;
 
         await db.query(insertQuery, [
@@ -160,7 +142,8 @@ app.post("/register", async (req, res) => {
             hashedPassword,
             name,
             phoneNumber,
-            village
+            village,
+            "RESIDENT"
         ]);
 
         return res.status(200).send("User created successfully");
@@ -173,10 +156,6 @@ app.post("/register", async (req, res) => {
         });
     }
 });
-
-/* =========================
-   LOGIN
-========================= */
 
 app.post("/login", async (req, res) => {
     try {
@@ -245,9 +224,7 @@ app.post("/login", async (req, res) => {
     }
 });
 
-/* =========================
-   GET DISCUSSIONS
-========================= */
+
 
 app.get("/discussions", authenticateToken, async (req, res) => {
     try {
@@ -276,9 +253,7 @@ app.get("/discussions", authenticateToken, async (req, res) => {
     }
 });
 
-/* =========================
-   CREATE DISCUSSION
-========================= */
+
 
 app.post("/discussions", authenticateToken, async (req, res) => {
     try {
@@ -325,9 +300,7 @@ app.post("/discussions", authenticateToken, async (req, res) => {
     }
 });
 
-/* =========================
-   GET ISSUES
-========================= */
+
 
 app.get("/issues", authenticateToken, async (req, res) => {
     try {
@@ -355,9 +328,7 @@ app.get("/issues", authenticateToken, async (req, res) => {
     }
 });
 
-/* =========================
-   CREATE ISSUE
-========================= */
+
 
 app.post("/issues", authenticateToken, async (req, res) => {
     try {
@@ -411,9 +382,6 @@ app.post("/issues", authenticateToken, async (req, res) => {
     }
 });
 
-/* =========================
-   UPDATE ISSUE STATUS
-========================= */
 
 app.put("/issues/:id", authenticateToken, async (req, res) => {
     try {
@@ -454,9 +422,6 @@ app.put("/issues/:id", authenticateToken, async (req, res) => {
     }
 });
 
-/* =========================
-   UPDATE PROFILE PICTURE
-========================= */
 
 app.put(
     "/users/:userId/profile-picture",
@@ -502,9 +467,6 @@ app.put(
     }
 );
 
-/* =========================
-   GLOBAL ERROR HANDLER
-========================= */
 
 app.use((error, req, res, next) => {
     console.error("GLOBAL ERROR:", error);
@@ -520,8 +482,5 @@ app.use((error, req, res, next) => {
     });
 });
 
-/* =========================
-   EXPORT
-========================= */
 
 module.exports = app;
