@@ -18,26 +18,16 @@ const allowedOrigins = [
     "http://localhost:5173",
 ];
 
-
 const corsOptions = {
-
     origin: function (origin, callback) {
 
-        if (
-            !origin ||
-            allowedOrigins.includes(origin)
-        ) {
+        if (!origin || allowedOrigins.includes(origin)) {
             return callback(null, true);
         }
 
-        console.log(
-            "Blocked CORS origin:",
-            origin
-        );
+        console.log("Blocked CORS origin:", origin);
 
-        return callback(
-            new Error("Not allowed by CORS")
-        );
+        return callback(new Error("Not allowed by CORS"));
     },
 
     methods: [
@@ -56,23 +46,26 @@ const corsOptions = {
     credentials: true
 };
 
-
 app.use(cors(corsOptions));
-
 app.use(express.json());
 
 
 
 const initializeDatabaseAndServer = async () => {
-    await db.connect();
-    try{
-        app.listen(PORT,"0.0.0.0", () => {
+    try {
+        await db.query("SELECT 1");
+
+        console.log("Database connected successfully");
+
+        app.listen(PORT, "0.0.0.0", () => {
             console.log(`Server is running on port ${PORT}`);
         });
+
     } catch (error) {
-        console.error("Error starting the server:", error.message);
+        console.error("Database connection failed:", error);
+        process.exit(1);
     }
-}
+};
 
 initializeDatabaseAndServer();
 
