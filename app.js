@@ -255,7 +255,8 @@ app.get("/discussions", authenticateToken, async (req, res) => {
             SELECT
                 d.*,
                 u.name,
-                u.role
+                u.role,
+                u.profile_picture_url
             FROM discussions d
             INNER JOIN users u
                 ON d.user_id = u.user_id
@@ -333,7 +334,8 @@ app.get("/issues", authenticateToken, async (req, res) => {
         const selectQuery = `
             SELECT
                 i.*,
-                u.name
+                u.name,
+                u.profile_picture_url
             FROM issues i
             INNER JOIN users u
                 ON i.user_id = u.user_id
