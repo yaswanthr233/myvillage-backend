@@ -521,6 +521,36 @@ app.get('/issues/:id', authenticateToken, async (req, res) => {
     }
 }) 
 
+app.put('/users/:userId', authenticateToken, async (req, res) => {
+    const { userId } = req.params;
+    const { name, phone, gender, dob,profile_picture_url } = req.body;
+    const updateQuery = `
+        UPDATE users
+        SET name = $1, phone_number = $2, gender = $3, dob = $4, profile_picture_url = $6
+        WHERE user_id = $5
+        RETURNING *
+    `;
+    const values = [name, phone, gender,dob, userId,profile_picture_url];
+    try{
+        const result = await db.query(updateQuery, values);
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                message: "User not found"
+            });
+
+        } else {
+            return res.status(200).json({
+                message: "User updated successfully",
+                user: result.rows[0]
+            });
+        }
+    } catch (error) {
+        console.error("UPDATE USER ERROR:", error);
+        return res.status(500).json({
+            message: "Internal server error"
+        });
+    }
+})
 
 app.use((error, req, res, next) => {
     console.error("GLOBAL ERROR:", error);
