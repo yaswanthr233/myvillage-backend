@@ -485,6 +485,42 @@ app.put(
     }
 );
 
+app.get('/issues/:id', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const selectQuery = `
+            SELECT
+                i.*,
+                u.name,
+                u.profile_picture_url,
+                u.role
+            FROM issues i
+            INNER JOIN users u
+                ON i.user_id = u.user_id
+            WHERE i.id = $1
+        `;
+
+        const dbIssue = await db.query(selectQuery, [id]);
+
+        if (dbIssue.rows.length === 0) {
+            return res.status(404).json({
+                message: "Issue not found"
+            });
+        }
+
+        return res.status(200).json(dbIssue.rows[0]);
+
+    }
+    catch (error) {
+        console.error("GET ISSUE DETAILS ERROR:", error);
+
+        return res.status(500).json({
+            message: "Internal server error"
+        });
+    }
+}) 
+
 
 app.use((error, req, res, next) => {
     console.error("GLOBAL ERROR:", error);
